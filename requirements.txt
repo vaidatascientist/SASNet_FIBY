@@ -6,4 +6,4 @@ scipy
 matplotlib
 torch
 torchvision
-tqdm
+pytorch-lightning

@@ -14,7 +14,7 @@
 # =============================================================================
 import torchvision.transforms as standard_transforms
 from torch.utils.data import DataLoader
-from .crowd_dataset import CrowdDataset
+from .crowd_dataset import FIBY
 import pytorch_lightning as pl
 
 # the function to return the dataloader 
@@ -26,10 +26,10 @@ def loading_data(data_root):
                                         std=[0.229, 0.224, 0.225]),
     ])
     # create the dataset
-    train_set = CrowdDataset(data_root, train=True,
+    train_set = FIBY(data_root, train=True,
                      transform=transform, patch=True, flip=True)
     # create the validation dataset
-    val_set = CrowdDataset(data_root, train=False, transform=transform)
+    val_set = FIBY(data_root, train=False, transform=transform)
 
     return train_set, val_set
 

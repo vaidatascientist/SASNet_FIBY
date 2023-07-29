@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # =============================================================================
+from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,39 +22,19 @@ from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
 import numpy as np
+from losses.loss import CombinedLoss
 
 import pytorch_lightning as pl
 from torchmetrics import Accuracy
 
-class Conv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, \
-                stride=1, NL='relu', same_padding=False, bn=False, dilation=1):
-        super(Conv2d, self).__init__()
-        padding = int((kernel_size - 1) // 2) if same_padding else 0
-        self.conv = []
-        if dilation==1:
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, dilation=dilation)
-        else:
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=dilation, dilation=dilation)
-        self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else nn.Identity()
-        if NL == 'relu' :
-            self.relu = nn.ReLU(inplace=True)
-        elif NL == 'prelu':
-            self.relu = nn.PReLU()
-        else:
-            self.relu = None
-
-    def forward(self, x):
-        x = self.conv(x)
-        if self.bn is not None:
-            x = self.bn(x)
-        if self.relu is not None:
-            x = self.relu(x)
-        return x
 
 # the main implementation of the SASNet
+# class SASNet(pl.LightningModule):
+#     def __init__(self, pretrained=False, args=None):
+#         super().__init__()
+        
 class SASNet(pl.LightningModule):
-    def __init__(self, pretrained=False, args=None):
+    def __init__(self, pretrained=False, args=None, training=None):
         super(SASNet, self).__init__()
         # define the backbone network
         vgg = models.vgg16_bn(pretrained=pretrained)
@@ -148,6 +129,11 @@ class SASNet(pl.LightningModule):
         self.train_acc = Accuracy(task='binary')
         self.val_acc = Accuracy(task='binary')
         
+        self.training = training
+        self.lr_drop = args.lr_drop
+        
+        self.criterion = CombinedLoss()
+        
     # the forward process
     def forward(self, x):
         size = x.size()
@@ -226,8 +212,65 @@ class SASNet(pl.LightningModule):
         print(density.shape)
         return density
 
+    def training_step(self, batch, args):
+        if self.training:
+            samples, targets = batch
+            outputs = self(samples)
+            losses = self.criterion(outputs / args.log_para, targets)
+            self.log('train_loss', losses)
+            return losses
+    
+    def validation_step(self, batch, args):
+        if self.training:
+            samples, targets = batch
+            outputs = self(samples)
+            
+            outputs = outputs.cpu().detach().numpy()
+            targets = targets.cpu().detach().numpy()
+            
+            for i_img in range(outputs.shape[0]):
+                pred_cnt = np.sum(outputs[i_img], (1, 2)) / args.log_para
+                gt_count = np.sum(targets[i_img], (1, 2))
+                mae = abs(gt_count - pred_cnt)
+                mse = (gt_count - pred_cnt) * (gt_count - pred_cnt)
+                
+            self.log('val_mae', mae, prog_bar=True)
+            self.log('val_rmse', np.sqrt(mse), prog_bar=True)
+
+    def configure_optimizers(self):
+        if self.training:
+            optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, self.lr_drop, gamma=0.7)
+            return [optimizer], [scheduler]
+
+class Conv2d(pl.LightningModule):
+    
+    def __init__(self, in_channels, out_channels, kernel_size, \
+                stride=1, NL='relu', same_padding=False, bn=False, dilation=1):
+        super(Conv2d, self).__init__()
+        padding = int((kernel_size - 1) // 2) if same_padding else 0
+        self.conv = []
+        if dilation==1:
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, dilation=dilation)
+        else:
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=dilation, dilation=dilation)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else nn.Identity()
+        if NL == 'relu' :
+            self.relu = nn.ReLU(inplace=True)
+        elif NL == 'prelu':
+            self.relu = nn.PReLU()
+        else:
+            self.relu = None
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.relu is not None:
+            x = self.relu(x)
+        return x
 # the module definition for the multi-branch in the density head
-class MultiBranchModule(nn.Module):
+class MultiBranchModule(pl.LightningModule):
     def __init__(self, in_channels, sync=False):
         super(MultiBranchModule, self).__init__()
         self.branch1x1 = BasicConv2d(in_channels, in_channels//2, kernel_size=1, sync=sync)
@@ -253,7 +296,7 @@ class MultiBranchModule(nn.Module):
         return torch.cat(outputs, 1)
 
 # the module definition for the basic conv module
-class BasicConv2d(nn.Module):
+class BasicConv2d(pl.LightningModule):
 
     def __init__(self, in_channels, out_channels, sync=False, **kwargs):
         super(BasicConv2d, self).__init__()
@@ -270,7 +313,24 @@ class BasicConv2d(nn.Module):
         x = self.bn(x)
         return F.relu(x, inplace=True)
 
-def build(args):
-    model = SASNet(pretrained=False, args=args)
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
 
+    def reset(self):
+        self.cur_val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+    # update the moving average
+    def update(self, cur_val):
+        self.cur_val = cur_val
+        self.sum += cur_val
+        self.count += 1
+        self.avg = self.sum / self.count
+
+
+def build(args, training):
+    model = SASNet(pretrained=False, args=args, training=training)
     return model

@@ -9,48 +9,20 @@ from engine import *
 from models import build_model
 
 import os
-from tensorboardX import SummaryWriter
 import warnings
 
 warnings.filterwarnings('ignore')
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set parameters for training SASNet', add_help=False)
-    parser.add_argument('--lr', default=1e-4, type=float)
-    # parser.add_argument('--lr_backbone', default=1e-5, type=float)
+    # parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--batch_size', default=8, type=int)
     # parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=3500, type=int)
-    # parser.add_argument('--lr_drop', default=3500, type=int)
+    parser.add_argument('--lr_drop', default=3500, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
     parser.add_argument('--block_size', default=32, type=int)
-
-    # Model parameters
-    # parser.add_argument('--frozen_weights', type=str, default=None,
-    #                     help="Path to the pretrained model. If set, only the mask head will be trained")
-
-    # * Backbone
-    # parser.add_argument('--backbone', default='vgg16_bn', type=str,
-    #                     help="Name of the convolutional backbone to use")
-
-    # * Matcher
-    # parser.add_argument('--set_cost_class', default=1, type=float,
-    #                     help="Class coefficient in the matching cost")
-
-
-    # parser.add_argument('--set_cost_point', default=0.05, type=float,
-    #                     help="L1 point coefficient in the matching cost")
-
-    # * Loss coefficients
-    # parser.add_argument('--point_loss_coef', default=0.0002, type=float)
-
-    # parser.add_argument('--eos_coef', default=0.5, type=float,
-    #                     help="Relative classification weight of the no-object class")
-    # parser.add_argument('--row', default=2, type=int,
-    #                     help="row number of anchor points")
-    # parser.add_argument('--line', default=2, type=int,
-    #                     help="line number of anchor points")
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='FIBY')
@@ -95,7 +67,7 @@ def main(args):
         filename='latest_model-{epoch:02d}-{val_rmse:.2f}',
     )
     
-    model, criterion = build_model(args, training=True)
+    model = build_model(args, training=True)
     dm = (args.data_root, args.batch_size,
                         args.num_workers, args.pin_memory)
     trainer = pl.Trainer(devices=4, accelerator="gpu",

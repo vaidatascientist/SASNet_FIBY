@@ -24,7 +24,7 @@ import cv2
 import glob
 from time import sleep
 
-class CrowdDataset(Dataset):
+class FIBY(Dataset):
     def __init__(self, data_root, transform=None, train=False, patch=False, flip=False):
         self.root_path = data_root
         self.train_lists = "fiby_train.list"
