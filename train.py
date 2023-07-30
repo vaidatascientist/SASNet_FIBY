@@ -20,38 +20,30 @@ def get_args_parser():
     # parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=3500, type=int)
     parser.add_argument('--lr_drop', default=3500, type=int)
-    parser.add_argument('--clip_max_norm', default=0.1, type=float,
-                        help='gradient clipping max norm')
     parser.add_argument('--block_size', default=32, type=int)
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='FIBY')
     parser.add_argument('--data_root', default='./datas',
                         help='path where the dataset is')
-    
-    parser.add_argument('--output_dir', default='./log',
-                        help='path where to save, empty for no saving')
+
     parser.add_argument('--checkpoints_dir', default='./ckpt',
                         help='path where to save checkpoints, empty for no saving')
-    parser.add_argument('--tensorboard_dir', default='./runs',
-                        help='path where to save, empty for no saving')
+    # parser.add_argument('--tensorboard_dir', default='./runs',
+    #                     help='path where to save, empty for no saving')
 
-    parser.add_argument('--seed', default=42, type=int)
-    # parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=8, type=int)
-    parser.add_argument('--eval_freq', default=5, type=int,
-                        help='frequency of evaluation, default setting is evaluating in every 5 epoch')
+    parser.add_argument('--num_workers', default=0, type=int)
+
     parser.add_argument('--gpu_id', default=0, type=int, help='the gpu used for training')
-    
-    # parser.add_argument('--transfer_weights_path', default=None, type=str)
 
     return parser
 
 def main(args):
-    print(args)
+    # print(args)
 
     best_mae_checkpoint_callback = ModelCheckpoint(
         monitor='val_rmse',

@@ -1,3 +1,4 @@
+
 # Copyright 2021 Tencent
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # =============================================================================
-from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,15 +26,10 @@ from losses.loss import CombinedLoss
 
 import pytorch_lightning as pl
 from torchmetrics import Accuracy
-
-
-# the main implementation of the SASNet
-# class SASNet(pl.LightningModule):
-#     def __init__(self, pretrained=False, args=None):
-#         super().__init__()
         
+
 class SASNet(pl.LightningModule):
-    def __init__(self, pretrained=False, args=None, training=None):
+    def __init__(self, args, pretrained=False):
         super(SASNet, self).__init__()
         # define the backbone network
         vgg = models.vgg16_bn(pretrained=pretrained)
@@ -129,8 +124,9 @@ class SASNet(pl.LightningModule):
         self.train_acc = Accuracy(task='binary')
         self.val_acc = Accuracy(task='binary')
         
-        self.training = training
+        # self.training = training
         self.lr_drop = args.lr_drop
+        self.log_para = args.log_para
         
         self.criterion = CombinedLoss()
         
@@ -212,36 +208,33 @@ class SASNet(pl.LightningModule):
         print(density.shape)
         return density
 
-    def training_step(self, batch, args):
-        if self.training:
-            samples, targets = batch
-            outputs = self(samples)
-            losses = self.criterion(outputs / args.log_para, targets)
-            self.log('train_loss', losses)
-            return losses
+    def training_step(self, batch, batch_idx):
+        samples, targets = batch
+        density = self(samples)
+        losses = self.criterion(density / self.log_para, targets)
+        self.log('train_loss', losses)
+        return losses
     
-    def validation_step(self, batch, args):
-        if self.training:
-            samples, targets = batch
-            outputs = self(samples)
+    def validation_step(self, batch, batch_idx):
+        samples, targets = batch
+        outputs = self(samples)
+        
+        outputs = outputs.cpu().detach().numpy()
+        targets = targets.cpu().detach().numpy()
+        
+        for i_img in range(outputs.shape[0]):
+            pred_cnt = np.sum(outputs[i_img], (1, 2)) / self.log_para
+            gt_count = np.sum(targets[i_img], (1, 2))
+            mae = abs(gt_count - pred_cnt)
+            mse = (gt_count - pred_cnt) * (gt_count - pred_cnt)
             
-            outputs = outputs.cpu().detach().numpy()
-            targets = targets.cpu().detach().numpy()
-            
-            for i_img in range(outputs.shape[0]):
-                pred_cnt = np.sum(outputs[i_img], (1, 2)) / args.log_para
-                gt_count = np.sum(targets[i_img], (1, 2))
-                mae = abs(gt_count - pred_cnt)
-                mse = (gt_count - pred_cnt) * (gt_count - pred_cnt)
-                
-            self.log('val_mae', mae, prog_bar=True)
-            self.log('val_rmse', np.sqrt(mse), prog_bar=True)
+        self.log('val_mae', mae, prog_bar=True)
+        self.log('val_rmse', np.sqrt(mse), prog_bar=True)
 
     def configure_optimizers(self):
-        if self.training:
-            optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
-            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, self.lr_drop, gamma=0.7)
-            return [optimizer], [scheduler]
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, self.lr_drop, gamma=0.9)
+        return [optimizer], [scheduler]
 
 class Conv2d(pl.LightningModule):
     
