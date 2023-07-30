@@ -14,6 +14,7 @@
 # limitations under the License.
 # =============================================================================
 import torch
+import sys
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
@@ -30,7 +31,7 @@ from torchmetrics import Accuracy
 
 class SASNet(pl.LightningModule):
     def __init__(self, args, pretrained=False):
-        super(SASNet, self).__init__()
+        super().__init__()
         # define the backbone network
         vgg = models.vgg16_bn(pretrained=pretrained)
 
@@ -209,9 +210,10 @@ class SASNet(pl.LightningModule):
         return density
 
     def training_step(self, batch, batch_idx):
-        samples, targets = batch
-        density = self(samples)
-        losses = self.criterion(density / self.log_para, targets)
+        
+        x, y = batch
+        density = self(x)
+        losses = self.criterion(density / self.log_para, y)
         self.log('train_loss', losses)
         return losses
     
@@ -225,8 +227,8 @@ class SASNet(pl.LightningModule):
         for i_img in range(outputs.shape[0]):
             pred_cnt = np.sum(outputs[i_img], (1, 2)) / self.log_para
             gt_count = np.sum(targets[i_img], (1, 2))
-            mae = abs(gt_count - pred_cnt)
-            mse = (gt_count - pred_cnt) * (gt_count - pred_cnt)
+            mae = float(abs(gt_count - pred_cnt))
+            mse = float((gt_count - pred_cnt) * (gt_count - pred_cnt))
             
         self.log('val_mae', mae, prog_bar=True)
         self.log('val_rmse', np.sqrt(mse), prog_bar=True)
@@ -324,6 +326,6 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def build(args, training):
-    model = SASNet(pretrained=False, args=args, training=training)
+def build(args):
+    model = SASNet(pretrained=False, args=args)
     return model

@@ -19,16 +19,19 @@ import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms.functional as F
+import torch.nn.functional as Fn
 import h5py
 import cv2
 import glob
 from time import sleep
+import skimage.transform
+
 
 class FIBY(Dataset):
     def __init__(self, data_root, transform=None, train=False, patch=False, flip=False):
         self.root_path = data_root
-        self.train_lists = "fiby_train.list"
-        self.eval_list = "fiby_test.list"
+        self.train_lists = "FIBY_train.list"
+        self.eval_list = "FIBY_test.list"
         # there may exist multiple list files
         self.img_list_file = self.train_lists.split(',')
         if train:
@@ -68,6 +71,7 @@ class FIBY(Dataset):
         img, target = load_data(img_path)
         
         # perform data augumentation
+        img = img.resize((300, 300), resample=Image.NEAREST)
         if self.transform is not None:
             img = self.transform(img)
             
@@ -79,7 +83,7 @@ class FIBY(Dataset):
             # scale the image and points
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(img.unsqueeze(0), scale_factor=scale).squeeze(0)
-                point *= scale
+                target = torch.nn.functional.upsample_bilinear(target.unsqueeze(0), scale_factor=scale).squeeze(0)
         # random crop augumentaiton
         if self.train and self.patch:
             img, point = random_crop(img, point)
@@ -93,9 +97,14 @@ class FIBY(Dataset):
                 point[i][:, 0] = 128 - point[i][:, 0]
 
         img = torch.Tensor(img)
-        target = torch.Tensor(target)
+        
+        resized_density_map = skimage.transform.resize(target, (300, 300))
+        resized_density_map *= np.sum(target) / np.sum(resized_density_map)
+        resized_density_map = torch.tensor(resized_density_map)
+        resized_density_map = resized_density_map.float()
+        resized_density_map = torch.unsqueeze(resized_density_map, 0)
 
-        return img, target
+        return img, resized_density_map
 
 def load_data(img_path):
     # get the path of the ground truth
