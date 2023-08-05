@@ -7,6 +7,9 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from engine import *
 # from models.sasnet import SASNet
 from models import build_model
+from datasets.loading_data import SASNet_Lightning
+
+from models.sasnet import SASNet
 
 import os
 import warnings
@@ -18,12 +21,10 @@ def get_args_parser():
     # parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--batch_size', default=8, type=int)
     # parser.add_argument('--weight_decay', default=1e-4, type=float)
-    parser.add_argument('--epochs', default=3500, type=int)
-    parser.add_argument('--lr_drop', default=3500, type=int)
+    parser.add_argument('--epochs', default=1000, type=int)
+    parser.add_argument('--lr_drop', default=300, type=int)
     parser.add_argument('--block_size', default=32, type=int)
 
-    # dataset parameters
-    parser.add_argument('--dataset_file', default='FIBY')
     parser.add_argument('--data_root', default='./datas',
                         help='path where the dataset is')
 
@@ -33,17 +34,15 @@ def get_args_parser():
     #                     help='path where to save, empty for no saving')
 
     parser.add_argument('--resume', default='', help='resume from checkpoint')
-    parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
-                        help='start epoch')
-    parser.add_argument('--eval', action='store_true')
     parser.add_argument('--num_workers', default=0, type=int)
+    parser.add_argument('--pin_memory', default=True, type=bool)
+    parser.add_argument('--log_para', default=1000, type=int, help='scaling factor')
 
-    parser.add_argument('--gpu_id', default=0, type=int, help='the gpu used for training')
 
     return parser
 
 def main(args):
-    # print(args)
+    print(args)
 
     best_mae_checkpoint_callback = ModelCheckpoint(
         monitor='val_rmse',
@@ -59,8 +58,9 @@ def main(args):
         filename='latest_model-{epoch:02d}-{val_rmse:.2f}',
     )
     
-    model = build_model(args, training=True)
-    dm = (args.data_root, args.batch_size,
+    model = build_model(args)
+    
+    dm = SASNet_Lightning(args.data_root, args.batch_size,
                         args.num_workers, args.pin_memory)
     trainer = pl.Trainer(devices=4, accelerator="gpu",
                          strategy="ddp_find_unused_parameters_true",

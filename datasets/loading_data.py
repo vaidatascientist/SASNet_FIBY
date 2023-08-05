@@ -34,7 +34,7 @@ def loading_data(data_root):
     return train_set, val_set
 
 
-class SASNet_Lightning(pl.LightningModule):
+class SASNet_Lightning(pl.LightningDataModule):
     def __init__(self, data_root, batch_size, num_workers, pin_memory):
         super().__init__()
         self.data_root = data_root

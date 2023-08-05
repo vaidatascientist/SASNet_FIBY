@@ -2,6 +2,8 @@ datas/
 weights/
 logs/
 venv/
+temp.ipynb
+lightning_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
