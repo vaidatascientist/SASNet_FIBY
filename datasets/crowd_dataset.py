@@ -18,13 +18,11 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
-import torchvision.transforms.functional as F
-import torch.nn.functional as Fn
 import h5py
-import cv2
-import glob
 from time import sleep
 import skimage.transform
+from torchvision import transforms
+
 
 
 class FIBY(Dataset):
@@ -70,13 +68,13 @@ class FIBY(Dataset):
         img_path = self.img_list[index]
         img, density_map = load_data(img_path)
         
-        # perform data augumentation
-        img = img.resize((300, 300), resample=Image.NEAREST)
-        if self.transform is not None:
-            img = self.transform(img)
-            
         if isinstance(density_map, np.ndarray):
             density_map = torch.from_numpy(density_map)
+        
+        # perform data augumentation
+        img = img.resize((128, 128), resample=Image.NEAREST)
+        if self.transform is not None:
+            img = self.transform(img)
             
         if self.train:
             # data augmentation -> random scale
@@ -86,19 +84,22 @@ class FIBY(Dataset):
             # scale the image and points
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(img.unsqueeze(0), scale_factor=scale).squeeze(0)
-                density_map = torch.nn.functional.upsample_bilinear(density_map.unsqueeze(0), scale_factor=scale).squeeze(0)
+                density_map = torch.nn.functional.upsample_bilinear(density_map.unsqueeze(0).unsqueeze(0), scale_factor=scale).squeeze(0).squeeze(0)
         # random crop augumentaiton
         if self.train and self.patch:
-            img, density_map = random_crop(img, density_map)
+            i, j, h, w = transforms.RandomCrop.get_params(img, output_size=(128, 128))
+            img = transforms.functional.crop(img, i, j, h, w)
+            density_map = transforms.functional.crop(density_map, i, j, h, w)
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
-            # random flip
-            img = torch.Tensor(img[:, :, :, ::-1].copy())
-            density_map = torch.Tensor(density_map[:, :, ::-1].copy())
+            img = transforms.functional.hflip(img)
+            density_map = transforms.functional.hflip(density_map)
 
         img = torch.Tensor(img)
         
-        resized_density_map = skimage.transform.resize(density_map, (300, 300))
+        density_map = density_map.numpy()
+        
+        resized_density_map = skimage.transform.resize(density_map, (128, 128))
         resized_density_map *= np.sum(density_map) / np.sum(resized_density_map)
         resized_density_map = torch.tensor(resized_density_map)
         resized_density_map = resized_density_map.float()

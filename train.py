@@ -28,7 +28,7 @@ def get_args_parser():
     parser.add_argument('--data_root', default='./datas',
                         help='path where the dataset is')
 
-    parser.add_argument('--checkpoints_dir', default='./ckpt',
+    parser.add_argument('--checkpoints_dir', default='./weights',
                         help='path where to save checkpoints, empty for no saving')
     # parser.add_argument('--tensorboard_dir', default='./runs',
     #                     help='path where to save, empty for no saving')
@@ -63,7 +63,7 @@ def main(args):
     dm = SASNet_Lightning(args.data_root, args.batch_size,
                         args.num_workers, args.pin_memory)
     trainer = pl.Trainer(devices=4, accelerator="gpu",
-                         strategy="ddp_find_unused_parameters_true",
+                         strategy="ddp",
                          callbacks=[best_mae_checkpoint_callback, latest_checkpoint_callback])
     trainer.fit(model, dm, ckpt_path=args.resume if args.resume else None)
 

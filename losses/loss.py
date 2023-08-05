@@ -18,10 +18,10 @@ class ConfLoss(nn.Module):
         super(ConfLoss, self).__init__()
         self.bce_loss = nn.BCEWithLogitsLoss()
 
-    def forward(self, C_preds, C_gts):
-        # C_preds and C_gts are lists containing confidence maps for each of the 5 scales
+    def forward(self, D_preds, D_gts):
+        # D_preds and C_gts are lists containing confidence maps for each of the 5 scales
         loss = 0
-        for C_pred, C_gt in zip(C_preds, C_gts):
+        for C_pred, C_gt in zip(D_preds, D_gts):
             loss += self.bce_loss(C_pred, C_gt)
         return loss
 
@@ -72,7 +72,9 @@ class PRALoss(nn.Module):
 
         D_est_p = torch.flatten(D_est)
         D_gt_p = torch.flatten(D_gt)
-
+        print(D_est.shape, D_gt.shape)
+        print(D_est_p.shape, D_gt_p.shape)
+        # exit(0)
         loss = (torch.norm(D_est_p - D_gt_p, p=2)**2 / torch.norm(G, p=2)**2) + \
                self.lambda_ * (torch.norm(D_est_p - D_gt_p, p=2)**2 / torch.norm(H, p=2)**2)
 
@@ -88,8 +90,8 @@ class CombinedLoss(nn.Module):
         self.beta = beta
         self.gamma = gamma
 
-    def forward(self, D_preds, D_gts, C_preds, C_gts):
+    def forward(self, D_preds, D_gts):
         pra = self.pra_loss(D_preds[0], D_gts[0])  # Assuming the main density map is the first in the list
         den = self.den_loss(D_preds, D_gts)
-        conf = self.conf_loss(C_preds, C_gts)
+        conf = self.conf_loss(D_preds, D_gts)
         return self.alpha * pra + self.beta * den + self.gamma * conf

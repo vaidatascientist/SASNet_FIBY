@@ -4,6 +4,9 @@ logs/
 venv/
 temp.ipynb
 lightning_logs/
+outputs_image/
+ckpt/
+temp_test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
