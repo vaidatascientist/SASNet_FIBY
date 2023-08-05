@@ -68,12 +68,15 @@ class FIBY(Dataset):
         
         # get the image path
         img_path = self.img_list[index]
-        img, point = load_data(img_path)
+        img, density_map = load_data(img_path)
         
         # perform data augumentation
         img = img.resize((300, 300), resample=Image.NEAREST)
         if self.transform is not None:
             img = self.transform(img)
+            
+        if isinstance(density_map, np.ndarray):
+            density_map = torch.from_numpy(density_map)
             
         if self.train:
             # data augmentation -> random scale
@@ -83,23 +86,20 @@ class FIBY(Dataset):
             # scale the image and points
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(img.unsqueeze(0), scale_factor=scale).squeeze(0)
-                target = torch.nn.functional.upsample_bilinear(target.unsqueeze(0), scale_factor=scale).squeeze(0)
+                density_map = torch.nn.functional.upsample_bilinear(density_map.unsqueeze(0), scale_factor=scale).squeeze(0)
         # random crop augumentaiton
         if self.train and self.patch:
-            img, point = random_crop(img, point)
-            for i, _ in enumerate(point):
-                point[i] = torch.Tensor(point[i])
+            img, density_map = random_crop(img, density_map)
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
             # random flip
             img = torch.Tensor(img[:, :, :, ::-1].copy())
-            for i, _ in enumerate(point):
-                point[i][:, 0] = 128 - point[i][:, 0]
+            density_map = torch.Tensor(density_map[:, :, ::-1].copy())
 
         img = torch.Tensor(img)
         
-        resized_density_map = skimage.transform.resize(target, (300, 300))
-        resized_density_map *= np.sum(target) / np.sum(resized_density_map)
+        resized_density_map = skimage.transform.resize(density_map, (300, 300))
+        resized_density_map *= np.sum(density_map) / np.sum(resized_density_map)
         resized_density_map = torch.tensor(resized_density_map)
         resized_density_map = resized_density_map.float()
         resized_density_map = torch.unsqueeze(resized_density_map, 0)
@@ -118,9 +118,9 @@ def load_data(img_path):
             break
         except:
             sleep(2)
-    target = np.asarray(gt_file['density'])
+    density_map = np.asarray(gt_file['density'])
 
-    return img, target
+    return img, density_map
 
 # random crop augumentation
 def random_crop(img, den, num_patch=4):
