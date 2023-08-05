@@ -65,7 +65,7 @@ class FIBY(Dataset):
         
         # get the image path
         img_path = self.img_list[index]
-        img, target = load_data(img_path)
+        img, point = load_data(img_path)
         
         # perform data augumentation
         if self.transform is not None:
@@ -93,7 +93,13 @@ class FIBY(Dataset):
                 point[i][:, 0] = 128 - point[i][:, 0]
 
         img = torch.Tensor(img)
-        target = torch.Tensor(target)
+        target = [{} for i in range(len(point))]
+        for i, _ in enumerate(point):
+            target[i]['point'] = torch.Tensor(point[i])
+            image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
+            image_id = torch.Tensor([image_id]).long()
+            target[i]['image_id'] = image_id
+            target[i]['labels'] = torch.ones([point[i].shape[0]]).long()
 
         return img, target
 
