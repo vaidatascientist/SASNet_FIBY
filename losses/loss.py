@@ -72,8 +72,6 @@ class PRALoss(nn.Module):
 
         D_est_p = torch.flatten(D_est)
         D_gt_p = torch.flatten(D_gt)
-        print(D_est.shape, D_gt.shape)
-        print(D_est_p.shape, D_gt_p.shape)
         # exit(0)
         loss = (torch.norm(D_est_p - D_gt_p, p=2)**2 / torch.norm(G, p=2)**2) + \
                self.lambda_ * (torch.norm(D_est_p - D_gt_p, p=2)**2 / torch.norm(H, p=2)**2)

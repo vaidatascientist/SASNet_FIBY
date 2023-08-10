@@ -79,7 +79,7 @@ def main(args, debug=False):
     # total_dev = 0
     
     # for img_path in image_paths:
-    img_path = '/home/ubuntu/SASNet_FIBY/datas/test/images/frame_001.jpg'
+    img_path = '/home/ubuntu/SASNet_FIBY/DATA_ROOT/test/images/frame_00040.jpg'
     # load the images
     img_raw = Image.open(img_path).convert('RGB')
     # round the size
@@ -91,25 +91,25 @@ def main(args, debug=False):
     
     pred_density_map = torch.exp(pred_density_map / model.log_para)
     
-    pred_count = torch.sum(pred_density_map).item()
-    print('Predicted count:', pred_count)
+    # exit(0)
+# 
 
-    # draw the predictions
-    # size = 3
-    # img_to_draw = cv2.cvtColor(np.array(img_raw), cv2.COLOR_RGB2BGR)
-    # for p in points:
-    #     img_to_draw = cv2.circle(img_to_draw, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
-    #     # save the visualized image
-    #     cv2.imwrite(os.path.join(args.output_dir, 'pred_lightning{}.jpg'.format(predict_cnt)), img_to_draw)
-    # # print(total_dev/len(image_paths))
-    # # print(predict_cnt)
+    
+    pred_count = torch.sum(pred_density_map).item()
+
     f, axarr = plt.subplots(1, 2)
     plt.rcParams['image.cmap'] = 'jet' # required for CUDA arrays
     img = img.detach().permute(0, 2, 3, 1).squeeze().cuda() 
     axarr[0].imshow(img.cpu().numpy())
-    pred_density_map = pred_density_map.squeeze().cpu().detach().numpy()
-    axarr[1].imshow(pred_density_map, cmap=plt.cm.jet)
+    pshow = pred_density_map.squeeze().cpu().detach().numpy()
+    axarr[1].imshow(pshow, cmap=plt.cm.jet)
     plt.savefig(os.path.join(args.output_dir, 'test_{}.jpg'.format(pred_count)))
+    # Load predicted density map
+    pred_density_map = pred_density_map.squeeze(0).cpu().detach().numpy()
+    # for i_img in range(pred_density_map.shape[0]):
+    pred_cnt = np.sum(pred_density_map, (1, 2)) / model.log_para
+    
+    print(pred_cnt)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('P2PNet evaluation script', parents=[get_args_parser()])

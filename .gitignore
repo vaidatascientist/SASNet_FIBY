@@ -7,6 +7,8 @@ lightning_logs/
 outputs_image/
 ckpt/
 temp_test.py
+DATA_ROOT/
+ShanghaiTech/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

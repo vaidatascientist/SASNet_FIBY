@@ -1,8 +1,8 @@
 import argparse
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from engine import *
 # from models.sasnet import SASNet
@@ -19,13 +19,14 @@ warnings.filterwarnings('ignore')
 def get_args_parser():
     parser = argparse.ArgumentParser('Set parameters for training SASNet', add_help=False)
     # parser.add_argument('--lr', default=1e-5, type=float)
-    parser.add_argument('--batch_size', default=8, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     # parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=1000, type=int)
     parser.add_argument('--lr_drop', default=300, type=int)
     parser.add_argument('--block_size', default=32, type=int)
 
-    parser.add_argument('--data_root', default='./datas',
+    # parser.add_argument('--data_root', default='./ShanghaiTech/part_A_final',
+    parser.add_argument('--data_root', default='./DATA_ROOT',
                         help='path where the dataset is')
 
     parser.add_argument('--checkpoints_dir', default='./weights',
@@ -60,10 +61,10 @@ def main(args):
     
     model = build_model(args)
     
+    logger = TensorBoardLogger(save_dir='./logs', name='SASNet')
     dm = SASNet_Lightning(args.data_root, args.batch_size,
                         args.num_workers, args.pin_memory)
-    trainer = pl.Trainer(devices=4, accelerator="gpu",
-                         strategy="ddp",
+    trainer = pl.Trainer(devices=4, accelerator="gpu", logger=logger,
                          callbacks=[best_mae_checkpoint_callback, latest_checkpoint_callback])
     trainer.fit(model, dm, ckpt_path=args.resume if args.resume else None)
 

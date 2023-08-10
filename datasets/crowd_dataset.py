@@ -22,14 +22,18 @@ import h5py
 from time import sleep
 import skimage.transform
 from torchvision import transforms
+import re
 
 
 
 class FIBY(Dataset):
     def __init__(self, data_root, transform=None, train=False, patch=False, flip=False):
         self.root_path = data_root
-        self.train_lists = "FIBY_train.list"
-        self.eval_list = "FIBY_test.list"
+        self.train_lists = "fiby_train.list"
+        self.eval_list = "fiby_test.list"
+        
+        # self.train_lists = 'shan_train.list'
+        # self.eval_list = 'shan_test.list'
         # there may exist multiple list files
         self.img_list_file = self.train_lists.split(',')
         if train:
@@ -66,6 +70,9 @@ class FIBY(Dataset):
         
         # get the image path
         img_path = self.img_list[index]
+        
+        # img_path = re.sub(r"(part_A_final/)", "", img_path, count=1)
+        
         img, density_map = load_data(img_path)
         
         if isinstance(density_map, np.ndarray):

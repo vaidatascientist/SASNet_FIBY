@@ -8,3 +8,5 @@ torch
 torchvision
 pytorch-lightning
 scikit-image
+-U 'tensorboard'
+regex

@@ -26,7 +26,7 @@ import numpy as np
 from losses.loss import CombinedLoss
 
 import pytorch_lightning as pl
-from torchmetrics import Accuracy
+from torchmetrics import MeanSquaredError
         
 
 class SASNet(pl.LightningModule):
@@ -122,8 +122,8 @@ class SASNet(pl.LightningModule):
         
         ###############################################
         
-        self.train_acc = Accuracy(task='binary')
-        self.val_acc = Accuracy(task='binary')
+        self.train_acc = MeanSquaredError()
+        self.val_acc = MeanSquaredError()
         
         # self.training = training
         self.lr_drop = args.lr_drop
@@ -213,17 +213,19 @@ class SASNet(pl.LightningModule):
         
         x, y = batch
         density = self(x)
-        # losses = self.criterion(density / self.log_para, y)
+        losses = self.criterion(density / self.log_para, y)
         # print(density.shape, y.shape)
         # print((density / self.log_para).shape,y.shape)
-        losses = torch.nn.functional.mse_loss(density / self.log_para, y)
+        # losses = torch.nn.functional.mse_loss(density / self.log_para, y)
         self.log('train_loss', losses)
         return losses
     
     def validation_step(self, batch, batch_idx):
         samples, targets = batch
         outputs = self(samples)
-        
+        if torch.isnan(outputs).any().item():
+            print(outputs)
+            # exit()
         outputs = outputs.cpu().detach().numpy()
         targets = targets.cpu().detach().numpy()
         
