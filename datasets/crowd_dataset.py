@@ -13,76 +13,73 @@
 # limitations under the License.
 # =============================================================================
 import os
+import cv2
 import random
 import torch
 import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 import h5py
-from time import sleep
-import skimage.transform
-from torchvision import transforms
-import re
-
-
+import skimage
+import torchvision.transforms as T
 
 class FIBY(Dataset):
-    def __init__(self, data_root, transform=None, train=False, patch=False, flip=False):
-        self.root_path = data_root
-        self.train_lists = "fiby_train.list"
-        self.eval_list = "fiby_test.list"
-        
-        # self.train_lists = 'shan_train.list'
-        # self.eval_list = 'shan_test.list'
-        # there may exist multiple list files
-        self.img_list_file = self.train_lists.split(',')
-        if train:
-            self.img_list_file = self.train_lists.split(',')
-        else:
-            self.img_list_file = self.eval_list.split(',')
-            
-        self.img_map = {}
-        self.img_list = []
-        # loads the image/gt pairs
-        for _, train_list in enumerate(self.img_list_file):
-            train_list = train_list.strip()
-            with open(os.path.join(self.root_path, train_list)) as fin:
-                for line in fin:
-                    if len(line) < 2: 
-                        continue
-                    line = line.strip().split()
-                    self.img_map[os.path.join(self.root_path, line[0].strip())] = \
-                                    os.path.join(self.root_path, line[1].strip())
-        self.img_list = sorted(list(self.img_map.keys()))
-        # number of samples
-        self.nSamples = len(self.img_list)
-        
-        self.transform = transform
+    def __init__(self, data_path:str, train=False):
+        super().__init__()
+        self.data_path = data_path
         self.train = train
-        self.patch = patch
-        self.flip = flip
-       
-    def __len__(self):
-        return self.nSamples
+        
+        img_paths, density_paths = self.load_paths()
 
-    def __getitem__(self, index):
-        assert index <= len(self), 'index range error'
+        self.img_transform = T.Compose([
+            T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
         
-        # get the image path
-        img_path = self.img_list[index]
+        self.img_paths = img_paths
+        self.density_paths = density_paths
         
-        # img_path = re.sub(r"(part_A_final/)", "", img_path, count=1) 
+    def load_paths(self):
+        img_paths = []
+        density_paths = []
         
-        img, density_map = load_data(img_path)
+        if self.train:
+            split = 'train'
+        else:
+            split = 'test'
+            
+        split_file = f"{self.data_path}/fiby_{split}.list"
+        # split_file = f"{self.data_path}/part_A_final/shan_{split}.list"
+        
+        with open(split_file, 'r') as f:
+            for line in f:
+                img_path, density_path = line.strip().split()
+                img_paths.append(f"{self.data_path}/{img_path}")
+                density_paths.append(f"{self.data_path}/{density_path}")
+
+        return img_paths, density_paths
+    
+    def __len__(self):
+        return len(self.img_paths)
+    
+    def __getitem__(self, idx):
+        img_path = self.img_paths[idx]
+        density_path = self.density_paths[idx]
+        
+        # img = Image.open(img_path).convert('RGB')
+        # img = img.resize((128, 128), resample=Image.NEAREST)        
+        # img = self.img_transform(img)
+
+        img = cv2.imread(img_path)
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        img = img.resize((128, 128), resample=Image.NEAREST)
+        img = self.img_transform(img)
+        
+        density_file = h5py.File(density_path)
+        density_map = np.asarray(density_file['density'])
         
         if isinstance(density_map, np.ndarray):
             density_map = torch.from_numpy(density_map)
-        
-        # perform data augumentation
-        img = img.resize((300, 300), resample=Image.NEAREST)
-        
-        if self.transform is not None:
-            img = self.transform(img)
             
         if self.train:
             # data augmentation -> random scale
@@ -93,64 +90,24 @@ class FIBY(Dataset):
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(img.unsqueeze(0), scale_factor=scale).squeeze(0)
                 density_map = torch.nn.functional.upsample_bilinear(density_map.unsqueeze(0).unsqueeze(0), scale_factor=scale).squeeze(0).squeeze(0)
+        
         # random crop augumentaiton
-        if self.train and self.patch:
-            i, j, h, w = transforms.RandomCrop.get_params(img, output_size=(128, 128))
-            img = transforms.functional.crop(img, i, j, h, w)
-            density_map = transforms.functional.crop(density_map, i, j, h, w)
+        if self.train:
+            i, j, h, w = T.RandomCrop.get_params(img, output_size=(128, 128))
+            img = T.functional.crop(img, i, j, h, w)
+            density_map = T.functional.crop(density_map, i, j, h, w)
         # random flipping
-        if random.random() > 0.5 and self.train and self.flip:
-            img = transforms.functional.hflip(img)
-            density_map = transforms.functional.hflip(density_map)
+        if random.random() > 0.5 and self.train:
+            img = T.functional.hflip(img)
+            density_map = T.functional.hflip(density_map)
 
         img = torch.Tensor(img)
         density_map = density_map.numpy()
-        
-        resized_density_map = skimage.transform.resize(density_map, (300, 300))
+
+        resized_density_map = skimage.transform.resize(density_map, (128, 128))
         resized_density_map *= np.sum(density_map) / np.sum(resized_density_map)
         resized_density_map = torch.tensor(resized_density_map)
         resized_density_map = resized_density_map.float()
         resized_density_map = torch.unsqueeze(resized_density_map, 0)
 
         return img, resized_density_map
-
-def load_data(img_path):
-    # get the path of the ground truth
-    gt_path = img_path.replace('.jpg', '_sigma4.h5').replace('images', 'ground_truth')
-    # open the image
-    img = Image.open(img_path).convert('RGB')
-    # load the ground truth
-    while True:
-        try:
-            gt_file = h5py.File(gt_path)
-            break
-        except:
-            sleep(2)
-    density_map = np.asarray(gt_file['density'])
-
-    return img, density_map
-
-# random crop augumentation
-def random_crop(img, den, num_patch=4):
-    half_h = 128
-    half_w = 128
-    result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
-    result_den = []
-    # crop num_patch for each image
-    for i in range(num_patch):
-        start_h = random.randint(0, img.size(1) - half_h)
-        start_w = random.randint(0, img.size(2) - half_w)
-        end_h = start_h + half_h
-        end_w = start_w + half_w
-        # copy the cropped rect
-        result_img[i] = img[:, start_h:end_h, start_w:end_w]
-        # copy the cropped points
-        idx = (den[:, 0] >= start_w) & (den[:, 0] <= end_w) & (den[:, 1] >= start_h) & (den[:, 1] <= end_h)
-        # shift the corrdinates
-        record_den = den[idx]
-        record_den[:, 0] -= start_w
-        record_den[:, 1] -= start_h
-
-        result_den.append(record_den)
-
-    return result_img, result_den

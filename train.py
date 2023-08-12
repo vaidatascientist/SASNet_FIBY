@@ -24,7 +24,7 @@ def get_args_parser():
     parser.add_argument('--lr_drop', default=300, type=int)
     parser.add_argument('--block_size', default=32, type=int)
 
-    # parser.add_argument('--data_root', default='./ShanghaiTech/part_A_final',
+    # parser.add_argument('--data_root', default='./ShanghaiTech',
     parser.add_argument('--data_root', default='./DATA_ROOT',
                         help='path where the dataset is')
 

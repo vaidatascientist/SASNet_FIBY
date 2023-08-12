@@ -17,24 +17,6 @@ from torch.utils.data import DataLoader
 from .crowd_dataset import FIBY
 import pytorch_lightning as pl
 
-# the function to return the dataloader 
-def loading_data(data_root):
-    # the augumentations
-    transform = standard_transforms.Compose([
-        # standard_transforms.Resize((256, 256)),
-        standard_transforms.ToTensor(), 
-        standard_transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225]),
-    ])
-    # create the dataset
-    train_set = FIBY(data_root, train=True,
-                     transform=transform, patch=True, flip=True)
-    # create the validation dataset
-    val_set = FIBY(data_root, train=False, transform=transform)
-
-    return train_set, val_set
-
-
 class SASNet_Lightning(pl.LightningDataModule):
     def __init__(self, data_root, batch_size, num_workers, pin_memory):
         super().__init__()
@@ -44,7 +26,8 @@ class SASNet_Lightning(pl.LightningDataModule):
         self.pin_memory = pin_memory
     
     def setup(self, stage=None):
-        self.train_set, self.val_set = loading_data(self.data_root)
+        self.train_set = FIBY(self.data_root, train=True)
+        self.val_set = FIBY(self.data_root, train=False)
     
     def train_dataloader(self):
         return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True,

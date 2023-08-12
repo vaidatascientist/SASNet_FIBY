@@ -214,8 +214,6 @@ class SASNet(pl.LightningModule):
         x, y = batch
         density = self(x)
         losses = self.criterion(density / self.log_para, y)
-        # print(density.shape, y.shape)
-        # print((density / self.log_para).shape,y.shape)
         # losses = torch.nn.functional.mse_loss(density / self.log_para, y)
         self.log('train_loss', losses)
         return losses
