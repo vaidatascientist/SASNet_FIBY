@@ -21,6 +21,7 @@ import pytorch_lightning as pl
 def loading_data(data_root):
     # the augumentations
     transform = standard_transforms.Compose([
+        # standard_transforms.Resize((256, 256)),
         standard_transforms.ToTensor(), 
         standard_transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                         std=[0.229, 0.224, 0.225]),

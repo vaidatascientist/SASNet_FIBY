@@ -71,7 +71,7 @@ class FIBY(Dataset):
         # get the image path
         img_path = self.img_list[index]
         
-        # img_path = re.sub(r"(part_A_final/)", "", img_path, count=1)
+        # img_path = re.sub(r"(part_A_final/)", "", img_path, count=1) 
         
         img, density_map = load_data(img_path)
         
@@ -79,7 +79,8 @@ class FIBY(Dataset):
             density_map = torch.from_numpy(density_map)
         
         # perform data augumentation
-        img = img.resize((128, 128), resample=Image.NEAREST)
+        img = img.resize((300, 300), resample=Image.NEAREST)
+        
         if self.transform is not None:
             img = self.transform(img)
             
@@ -103,10 +104,9 @@ class FIBY(Dataset):
             density_map = transforms.functional.hflip(density_map)
 
         img = torch.Tensor(img)
-        
         density_map = density_map.numpy()
         
-        resized_density_map = skimage.transform.resize(density_map, (128, 128))
+        resized_density_map = skimage.transform.resize(density_map, (300, 300))
         resized_density_map *= np.sum(density_map) / np.sum(resized_density_map)
         resized_density_map = torch.tensor(resized_density_map)
         resized_density_map = resized_density_map.float()
