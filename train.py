@@ -3,7 +3,6 @@ import argparse
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 from engine import *
 # from models.sasnet import SASNet
 from models import build_model
@@ -43,6 +42,7 @@ def get_args_parser():
     return parser
 
 def main(args):
+    pl.seed_everything(42, workers=True)
     print(args)
 
     best_mae_checkpoint_callback = ModelCheckpoint(

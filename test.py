@@ -79,7 +79,7 @@ def main(args, debug=False):
     # total_dev = 0
     
     # for img_path in image_paths:
-    img_path = '/home/ubuntu/SASNet_FIBY/DATA_ROOT/test/images/frame_00040.jpg'
+    img_path = '/home/ubuntu/SASNet_FIBY/DATA_ROOT/test/images/frame_00001.jpg'
     # load the images
     img_raw = Image.open(img_path).convert('RGB')
     # round the size
@@ -90,7 +90,6 @@ def main(args, debug=False):
     pred_density_map = model(img)
     
     pred_density_map = torch.exp(pred_density_map / model.log_para)
-    
     # exit(0)
 # 
 
